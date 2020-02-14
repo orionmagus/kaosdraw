@@ -17,6 +17,8 @@ django = "*"
 rtree = "*"
 torch = "*"
 torchvision = "*"
+tensorflow = "*"
+sklearn = "*"
 
 [requires]
 python_version = "3.6"
