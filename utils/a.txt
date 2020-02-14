@@ -1,0 +1,26 @@
+
+[Unit]
+  Description=media mount script
+  Requires=network-online.target
+  After=network.target
+  Before=sickrage.service
+
+[Mount]
+  What=//nas01/Media
+  Where=/mnt/mediatera
+  Options=username=root,password=,rw,uid=1000,gid=1000
+  Type=cifs
+
+[Install]
+  WantedBy=multi-user.target
+  WantedBy=remote-fs.target
+
+
+import os
+import re
+PAGE_REGEX = re.compile(r'[0-9]+\.(jpg|bmp|tif|tiff|png|tga)', re.I)
+HTML_REGEX = re.compile(r'[0-9]+\.(htm|html)', re.I)
+
+d = ''
+lis = [i for i in  os.listdir(d) if REGEX.findall(i)]
+html='<html><body><div>%s</div></body></html>' % '</div><div>'.join(['<img src="images/%d.jpg"/>' % l for l in range(1, len(lis) if l in lis )]))

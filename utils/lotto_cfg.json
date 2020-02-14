@@ -1,0 +1,17 @@
+{
+    "credentials": "include",
+    "headers": {
+        "accept": "*/*",
+        "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
+        "cache-control": "no-cache",
+        "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "x-requested-with": "XMLHttpRequest"
+    },
+    "referrer": "https://www.nationallottery.co.za/lotto-history",
+    "referrerPolicy": "no-referrer-when-downgrade",
+    "body": "gameName=LOTTO&startDate=01/01/2019&endDate=25/12/2019&offset=0&limit=51&isAjax=true&isAjax=true",
+    "method": "POST",
+    "mode": "cors"
+}
