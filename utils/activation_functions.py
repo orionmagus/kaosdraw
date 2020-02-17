@@ -1,7 +1,8 @@
 import numpy as np
-from scipy.stats import truncnorm
-
-
+from scipy.stats import truncnorm, crystalball
+from sklearn.model_selection import train_test_split
+import sklearn.neural_network
+import sklearn.metrics
 @np.vectorize
 def sigmoid(x):
     return 1 / (1 + np.e ** -x)
@@ -13,6 +14,9 @@ def sigmoid_deriv(x):
 
 
 def truncated_normal(mean=0, sd=1, low=0, upp=10):
+    if True:
+        return crystalball(
+            (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
     return truncnorm(
         (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
 
