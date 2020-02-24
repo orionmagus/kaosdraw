@@ -7,7 +7,7 @@ from math import *
 
 def conv(n, N=52):
     n = int(n) if isinstance(n, str) else n
-    n = math.ceil(n) if isinstance(n, float) else n
+    n = ceil(n) if isinstance(n, float) else n
     n = n % N
     return N - (n-1)
 
@@ -124,7 +124,7 @@ class NumPool(numpy.lib.mixins.NDArrayOperatorsMixin):
 
         return {self._cols[i]: ball.array() for i, ball in enumerate(self._i) if i < len(self._cols)}
 
-    # def __dict__(self):
+    # def _asdict(self):
     #     return dict(zip(self._cols, self._i))
 
     def __array__(self):
@@ -145,7 +145,7 @@ class NumPool(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         if method == '__call__':
-            N = None
+            N = self.N
             scalars = []
             for input in inputs:
                 # In this case we accept only scalar numbers or ResultsArray.
@@ -153,7 +153,7 @@ class NumPool(numpy.lib.mixins.NDArrayOperatorsMixin):
                     scalars.append(input)
                 elif isinstance(input, self.__class__):
                     scalars.append(np.array(input))
-                    N = len(self._N)
+                    N = self.N
                 else:
                     return NotImplemented
             return self.__class__(binarr_to_values(ufunc(*scalars, **kwargs)))
@@ -170,7 +170,7 @@ def ball(value, N=52, p=None):
     return b
 
 
-def array_to_ball(r):
+def to_ball(r):
     cr = np.ceil(r, ).astype(int)
     return ball(
         (int(''.join(np.array([1 if n > 0 else 0 for n in cr.tolist()]).astype(
@@ -212,7 +212,7 @@ class BallInt(int):
             if len(value) < self.N or np.max(np.abs(value)) > 20:
                 value = ceil(np.mean(value))
             else:
-                value = np.array(value) * 2 - 1
+                value = np.array(value)
         value = value % self.N if value != self.N else self.N
         self._value = 1 if value < 1 else value
 

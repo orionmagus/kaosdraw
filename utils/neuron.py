@@ -176,7 +176,7 @@ def apprec(x, cols=('ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6', 'bonus
 
 
 def train_split(data, split_by=25, cols=('ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6', 'bonusBall')):
-    r, c = data.shape
+    r = data.shape[0]
     chunk_indices = [(k, min(r, k+split_by)-1, min(r, k+split_by))
                      for k in range(0, r-split_by)]
     data['record'] = 0
@@ -189,14 +189,6 @@ def train_split(data, split_by=25, cols=('ball1', 'ball2', 'ball3', 'ball4', 'ba
     ncols = ['R{}'.format(x) for x in range(1, split_by)]
     trgs = pd.concat(targets)
     return pd.DataFrame(inputs, columns=ncols, index=trgs.index)
-
-# class DrawResult(np.ndarray):
-#     def __init__(self, *balls):
-#         # super().__init__()
-#         self.bball = balls[-1]
-#         # self.value = [1 if x in balls[:-1] else 0 for x in range(1, 50)]
-#         self._vals = [float('{}'.format(x)) for x in balls[:-1]]
-#         cols = ['ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6', 'bonusBall']
 
 
 def to_tensor(v):
