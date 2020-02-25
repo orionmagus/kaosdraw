@@ -13,10 +13,12 @@ def sigmoid_deriv(x):
     return x * (1 - x)
 
 
+def cball(mean=0, sd=1, low=0, upp=10):
+    return crystalball(
+        (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
+
+
 def truncated_normal(mean=0, sd=1, low=0, upp=10):
-    if True:
-        return crystalball(
-            (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
     return truncnorm(
         (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
 

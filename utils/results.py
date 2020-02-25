@@ -75,45 +75,6 @@ class LottoResults:
             # logger.error(e)
             return []
 
-    def get_data(self, year):
-        try:
-            response = self.sess.post(
-                self.url,
-                data=datastr(year, **{'game': self.game}),
-                # timeout=0.8,
-                **POSTKWARGS
-            )
-            if response.ok:
-                result = response.json()
-                self.store[str(year)] = result.get('data', [])
-                return self.store[str(year)]
-            else:
-                return
-        except Exception as e:
-            print(e)
-            # logger.error(e)
-            return
-
-    def dataframe(self):
-        records = []
-        for y in range(2014, 2021):
-            k = str(y)
-            if k not in list(self.store.keys()):
-                r = self.get_data(k)
-            if self.store[k] is not None:
-                records.extend(self.store[k])
-        df = pd.DataFrame(records)  # .set_index('drawNumber')
-        df['dn'] = df.drawNumber.astype(int)
-        df = df.sort_values('dn')
-        self.df = df.set_index('dn')
-        return self.df
-
-    def close(self):
-        self.df.to_json('data/{}_daf.json'.format(self.stub[:5]))
-        self.df.to_pickle('data/{}_daf.pickle'.format(self.stub[:5]))
-        with open(self.st_file, 'w') as f:
-            json.dump(self.store, f)
-
 
 def format_df(df):
     cols = ('drawNumber', 'ball1', 'ball2', 'ball3',
@@ -132,10 +93,10 @@ def format_df(df):
 
 def get_data():
     lotto = LottoResults()
-    r = lotto.update_data(datetime.strptime('%Y/%m/%d'))
+    r = lotto.update_data(None)
     if r:
         if len(r) > 0:
-            df = pd.DataFrame(records)
+            df = pd.DataFrame(r)
             return format_df(df)
     return False
 
@@ -172,19 +133,23 @@ def as_record(data, cols=('ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6'))
 
 
 def load_data_target(records=False):
+    from django_pandas.io import read_frame
+    from utils.numbers import as_recs, NumPool
     values = ['draw_number', 'ball1', 'ball2',
               'ball3', 'ball4', 'ball5', 'ball6']
-    df = pd.DataFrame(LottoDraw.objects.values(
-        *values)).set_index('draw_number')
-    if records:
-        df = as_record(df)
-        values = ['record']
-        df.record = df.record.apply(lambda k: NumPool(**json.loads(k)))
+    df_kwargs = dict(fieldnames=values, verbose=False,
+                     index_col='pk', coerce_float=False)
 
-    values = values[1:]
+    df = read_frame(LottoDraw.objects.all(), **df_kwargs)
+    if records:
+        df = as_recs(df)
+        values = ['record']
+        # df.record = df.record.apply(lambda k: NumPool(**json.loads(k)))
+    else:
+        values = values[1:]
     trgs = df[values]
     trgs = trgs.copy()
-    trgs.index = trgs.index + 1
+    trgs.index = trgs.index - 1
     df = df.merge(trgs, how='left', left_index=True,
                   right_index=True, suffixes=['', '_y'])
     if not records:

@@ -1,10 +1,11 @@
 from django_pandas.managers import DataFrameQuerySet
 from django_pandas.io import read_frame
-from utils.numbers import NumPool
+from utils.pandas_ext import LottoAccessor
 
 
 class ResultsQuerySet(DataFrameQuerySet):
-    def to_dataframe(self, fieldnames=(), verbose=False, index=None, coerce_float=False):
+    def to_dataframe(self, fieldnames=('draw_number', 'ball1', 'ball2',
+                                       'ball3', 'ball4', 'ball5', 'ball6'), verbose=False, index='pk', coerce_float=False):
         return super(ResultsQuerySet, self).to_dataframe(
             fieldnames, verbose, index, coerce_float)
 

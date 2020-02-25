@@ -1,5 +1,5 @@
 import pandas as pd
-from utils.pandas_dtypes import LottoResult
+from utils.pandas_dtypes import LottoResult, hasget
 
 
 @pd.api.extensions.register_dataframe_accessor("lotto")
@@ -22,7 +22,12 @@ class LottoAccessor:
 
     @property
     def result(self):
-        return LottoResult(**self.dres)
+        cols = (
+            'ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6',
+            #  'bonusBall', 'powerBall'
+        )
+        vals = [hasget(self._obj, c) for c in cols]
+        return vals
 
     def plot(self):
         # plot this array's data on a map, e.g., using Cartopy

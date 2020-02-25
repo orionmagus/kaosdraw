@@ -1,9 +1,17 @@
 import numpy as np
 import pandas as pd
+from math import sqrt
 from utils.activation_functions import get_func, truncated_normal
 import json
+from utils.numbers import NumPool
 from lotto.models import NeuralNetGroup, NeuralModel as NeuralNet
 # activation_function = get_func('sigmoid')
+
+
+def pool_accuracy(ypred, ytrue):
+    na = np.array(NumPool(ypred))
+    nb = np.array(NumPool(ytrue))
+    return np.sum(na & nb)/6.0
 
 
 def fromdt(dt, c):
@@ -53,8 +61,8 @@ class NeuralNetwork(object):
         self.errors = []
         self.metrics = metrics
         self.loss = loss
-        self.metric_fn = lambda x, xx: x/xx
-        self.loss_fn = lambda o, t: t-o
+        self.metric_fn = pool_accuracy
+        self.loss_fn = lambda o, t: sqrt(t-o)
         if node_weights:
             for n, weights in json.loads(node_weights).items():
 
@@ -81,9 +89,9 @@ class NeuralNetwork(object):
     def save(self):
         ng = NeuralNetGroup.objects.get(pk=1)
         inf = pd.DataFrame(self.weights_in_hidden)
-        inf.to_pickle('{}_in.pickle'.format(self.net_ident))
+        # inf.to_pickle('{}_in.pickle'.format(self.net_ident))
         out = pd.DataFrame(self.weights_hidden_out)
-        out.to_pickle('{}_out.pickle'.format(self.net_ident))
+        # out.to_pickle('{}_out.pickle'.format(self.net_ident))
 
         cfg = {
             'group': ng,

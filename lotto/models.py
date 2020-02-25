@@ -1,4 +1,5 @@
 from django.db import models
+from lotto.managers import ResultsQuerySet
 # from lotto.fields import NeuronWeightField
 # Create your models here.
 
@@ -22,6 +23,7 @@ class LottoDraw(models.Model):
 
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
+    objects = models.Manager.from_queryset(ResultsQuerySet)
 
 
 class NeuralNetGroup(models.Model):

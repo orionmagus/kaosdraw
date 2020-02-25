@@ -5,6 +5,15 @@ from math import *
 # from tensorflow.keras.metrics import binary_accuracy
 
 
+def acca(x, y): return len([a for a in x._i if a in y._i])/6.0
+
+
+def accuracy(a, b):
+    na = 1 - np.array(a)
+    nb = 1 - np.array(b)
+    return np.sum(na & nb)/6.0
+
+
 def conv(n, N=52):
     n = int(n) if isinstance(n, str) else n
     n = ceil(n) if isinstance(n, float) else n
@@ -75,11 +84,13 @@ def binarr_to_values(val, N=52):
 
 
 def pool(N=52):
+    # N += 1
     return N - np.arange(N)
 
 
 def nmax(N=52):
-    return int(str('{:0<'+str(N)+'s}').format('111111'), 2)
+    N += 1
+    return 2 ** N - 1
 
 
 def sigmoid(x):
@@ -98,34 +109,87 @@ def binmax(arr):
     return np.array([1 if n > 0 else 0 for n in arr])
 
 
+def non_zero(x):
+    return [c for c in x if c > 0]
+
+
+def as_recs(data, cols=(
+            'ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6',
+            #  'bonusBall', 'powerBall'
+            )):
+    data['record'] = 0
+    data['record'] = data.record.astype('O')
+
+    def rec(row):
+        vals = [row[c] for c in cols]
+        row['record'] = NumPool(vals)
+        return row
+    data = data.apply(rec, axis=1)
+    return data[['record']]
+
+
 class NumPool(numpy.lib.mixins.NDArrayOperatorsMixin):
     def __init__(self, value=tuple(), shape=(6, 52), **kw):
-        if not isinstance(value, list) or not isinstance(value, tuple):
-            if isinstance(value, Number):
-                if value <= 52:
-                    value = [value]
         self._max, self.N = shape
         self._N = pool(self.N)
+        self._fmt = binfmt(self.N)
+        if not isinstance(value, list) or not isinstance(value, tuple):
+            if isinstance(value, Number):
+                if isinstance(value, float):
+                    value = int(round(value * nmax(self.N)))
+                if isinstance(value, int):
+                    if value <= 52:
+                        value = [value]
+                    else:
+                        value = non_zero(
+                            np.where(
+                                np.array([c == '1' for c in list(
+                                    self._fmt(bin(value)[2:]))]),
+                                self._N,
+                                0
+                            ))
+
+        if isinstance(value, np.ndarray):
+            if np.max(value.astype(int)) == 1:
+                value = non_zero(
+                    np.where(
+                        np.array([c == '1' for c in list(
+                            self._fmt(''.join(value.astype(str))))]),
+                        self._N,
+                        0
+                    ))
+
         self._cols = (
             'ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6',
             #  'bonusBall', 'powerBall'
         )
         self._i = []
-        val = [self.draw(v) for v in value]
+        vals = [self.draw(v) for v in value]
 
         for name in self._cols:
             if name in list(kw.keys()):
                 self.draw(kw.get(name))
 
-        # setattr(self, name, value)
     def get_results(self, to_numpy=True):
         if not to_numpy:
             return self._i
 
         return {self._cols[i]: ball.array() for i, ball in enumerate(self._i) if i < len(self._cols)}
 
+    @property
+    def max(self):
+        return nmax(self.N) * 1.0
     # def _asdict(self):
     #     return dict(zip(self._cols, self._i))
+
+    def __int__(self):
+        return int(''.join((1-np.array(self)).astype(str)), 2)
+
+    def __index__(self):
+        return float(self)
+
+    def __float__(self):
+        return int(self) * 1.0 / self.max
 
     def __array__(self):
         return np.where(np.isin(self._N, self._i), 0, 1)

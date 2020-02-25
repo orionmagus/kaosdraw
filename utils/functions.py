@@ -30,4 +30,6 @@ def hasget(o, n, default=0):
         return getattr(o, n)
     return default
 
- dfn = lambda x: x 
+
+def dfn(x):
+    return x

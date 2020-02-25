@@ -5,8 +5,7 @@ from pandas.api.extensions import (
     ExtensionArray
 )
 from pandas._libs import lib
-from utils.numbers import (
-    ball, to_ball, BallInt)
+from utils.numbers import *
 from utils.functions import (hasget, dfn)
 import numpy as np
 import re
@@ -14,53 +13,116 @@ import re
 
 class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
     def __init__(self, *args, **kwargs):
+        value = kwargs.get('value', args[0] if len(args) > 0 else [])
+        kwargs['value'] = value
+        self._init(**kwargs)
+
+    def _init(self, value=tuple(), shape=(6, 52), **kw):
+        self._max, self.N = shape
+        self._N = pool(self.N)
+        if not isinstance(value, list) or not isinstance(value, tuple):
+            if isinstance(value, Number):
+                if isinstance(value, float):
+                    value = int(round(value * nmax(self.N)))
+                if isinstance(value, int):
+                    if value <= 52:
+                        value = [value]
+                    else:
+                        value = non_zero(
+                            np.where(
+                                np.array([c == '1' for c in list(
+                                    '{:0>52s}'.format(bin(x)[2:]))]),
+                                self._N,
+                                0
+                            )).tolist()
+
+        if isinstance(value, np.ndarray):
+            if np.max(value.astype(int)) == 1:
+                value = non_zero(
+                    np.where(
+                        np.array([c == '1' for c in list(
+                            '{:0>52s}'.format(''.join(value.astype(str))))]),
+                        self._N,
+                        0
+                    ))
+
+        self._cols = (
+            'ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6',
+            #  'bonusBall', 'powerBall'
+        )
         self._i = []
+        vals = [self.draw(v) for v in value]
+
+        for name in self._cols:
+            if name in list(kw.keys()):
+                self.draw(kw.get(name))
+
+    @property
+    def max(self):
+        return nmax(self.N) * 1.0
+    # def _asdict(self):
+    #     return dict(zip(self._cols, self._i))
+
+    def __int__(self):
+        return int(''.join(np.array(self).astype(str)), 2)
+
+    def __index__(self):
+        return float(self)
+
+    def __float__(self):
+        return int(self) / self.max
+
+    def get_results(self, to_numpy=True):
+        if not to_numpy:
+            return self._i
+
+        return {self._cols[i]: ball.array() for i, ball in enumerate(self._i) if i < len(self._cols)}
+
+    def _asdict(self):
+        return dict(zip(self._cols, self._i))
+
+    def __array__(self):
+        return np.where(np.isin(self._N, self._i), 0, 1)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.N}-{self._i})"
+
+    def draw(self, value):
+        if (not value or
+            len(self._i) == self._max or
+                value in self._i):
+            return None
+
+        b = ball(value, N=self.N, p=np.array(self))
+        self._i.append(b)
+        return b
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        if method == '__call__':
+            N = self.ndim
+            scalars = []
+            for input in inputs:
+                # In this case we accept only scalar numbers or ResultsArray.
+                if isinstance(input, Number):
+                    scalars.append(input)
+                elif isinstance(input, self.__class__):
+                    scalars.append(np.array(input))
+                    N = self.ndim
+                else:
+                    return NotImplemented
+            return self.__class__(binarr_to_values(ufunc(*scalars, **kwargs)))
+        else:
+            return NotImplemented
 
     @classmethod
     def _from_sequence(cls, scalars, dtype=None, copy=False):
-        """
-        Construct a new ExtensionArray from a sequence of scalars.
-
-        Parameters
-        ----------
-        scalars : Sequence
-            Each element will be an instance of the scalar type for this
-            array, ``cls.dtype.type``.
-        dtype : dtype, optional
-            Construct for this particular dtype. This should be a Dtype
-            compatible with the ExtensionArray.
-        copy : bool, default False
-            If True, copy the underlying data.
-
-        Returns
-        -------
-        ExtensionArray
-        """
-
-        raise AbstractMethodError(cls)
+        vals = np.array(scalars, dtype=dtype, copy=copy)
+        _inst = cls(value=vals)
+        return _inst
 
     @classmethod
     def _from_sequence_of_strings(cls, strings, dtype=None, copy=False):
-        """Construct a new ExtensionArray from a sequence of strings.
-
-        .. versionadded:: 0.24.0
-
-        Parameters
-        ----------
-        strings : Sequence
-            Each element will be an instance of the scalar type for this
-            array, ``cls.dtype.type``.
-        dtype : dtype, optional
-            Construct for this particular dtype. This should be a Dtype
-            compatible with the ExtensionArray.
-        copy : bool, default False
-            If True, copy the underlying data.
-
-        Returns
-        -------
-        ExtensionArray
-        """
-        raise AbstractMethodError(cls)
+        return cls._from_sequence(scalars, dtype=dtype, copy=copy)
 
     @classmethod
     def _from_factorized(cls, values, original):
@@ -79,7 +141,7 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
         factorize
         ExtensionArray.factorize
         """
-        raise AbstractMethodError(cls)
+        return cls(values)
 
     # ------------------------------------------------------------------------
     # Must be a Sequence
@@ -165,10 +227,10 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
         # Note, also, that Series/DataFrame.where internally use __setitem__
         # on a copy of the data.
         if isinstance(key, int):
-            return self._i[item]
+            self._i[item] = value
 
         elif isinstance(key, np.ndarray):
-            return self._i = [v for ad, v in zip(item.tolist(), self._i) if ad])
+            self._i = [v for ad, v in zip(item.tolist(), value) if ad]
 
     def __len__(self):
         return len(self._i)
@@ -183,37 +245,12 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
         for i in range(len(self._i)):
             yield self[i]
 
-    def to_numpy(self, dtype = None, copy = False, na_value = lib.no_default):
-        """
-        Convert to a NumPy ndarray.
-
-        .. versionadded:: 1.0.0
-
-        This is similar to :meth:`numpy.asarray`, but may provide additional control
-        over how the conversion is done.
-
-        Parameters
-        ----------
-        dtype : str or numpy.dtype, optional
-            The dtype to pass to :meth:`numpy.asarray`.
-        copy : bool, default False
-            Whether to ensure that the returned value is a not a view on
-            another array. Note that ``copy=False`` does not *ensure* that
-            ``to_numpy()`` is no-copy. Rather, ``copy=True`` ensure that
-            a copy is made, even if not strictly necessary.
-        na_value : Any, optional
-            The value to use for missing values. The default value depends
-            on `dtype` and the type of the array.
-
-        Returns
-        -------
-        numpy.ndarray
-        """
-        result=np.asarray(self, dtype = dtype)
+    def to_numpy(self, dtype=None, copy=False, na_value=lib.no_default):
+        result = np.asarray(self, dtype=dtype)
         if copy or na_value is not lib.no_default:
-            result=result.copy()
+            result = result.copy()
         if na_value is not lib.no_default:
-            result[self.isna()]=na_value
+            result[self.isna()] = na_value
         return result
 
     # ------------------------------------------------------------------------
@@ -225,14 +262,14 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
         """
         An instance of 'ExtensionDtype'.
         """
-        raise AbstractMethodError(self)
+        return LottoResult()
 
     @property
     def shape(self):
         """
         Return a tuple of the array dimensions.
         """
-        return (len(self._i),)
+        return (len(self._N),)
 
     @property
     def ndim(self):
@@ -249,14 +286,13 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
     # Additional Methods
     # ------------------------------------------------------------------------
 
-    def astype(self, dtype, copy = True):
+    def astype(self, dtype, copy=True):
 
-        return np.array(self._i, dtype = dtype, copy = copy)
+        return np.array(self._i, dtype=dtype, copy=copy)
 
     def isna(self):
 
         return np.isnan(self._i)
-
 
     def _values_for_factorize(self):
         """
@@ -321,69 +357,19 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
         #    original ExtensionArray.
         # 2. ExtensionArray.factorize.
         #    Complete control over factorization.
-        arr, na_value=self._values_for_factorize()
+        arr, na_value = self._values_for_factorize()
 
-        codes, uniques=_factorize_array(
-            arr, na_sentinel = na_sentinel, na_value = na_value
+        codes, uniques = _factorize_array(
+            arr, na_sentinel=na_sentinel, na_value=na_value
         )
 
-        uniques=self._from_factorized(uniques, self)
+        uniques = self._from_factorized(uniques, self)
         return codes, uniques
-
-    _extension_array_shared_docs[
-        "repeat"
-    ] = """
-        Repeat elements of a %(klass)s.
-
-        Returns a new %(klass)s where each element of the current %(klass)s
-        is repeated consecutively a given number of times.
-
-        Parameters
-        ----------
-        repeats : int or array of ints
-            The number of repetitions for each element. This should be a
-            non-negative integer. Repeating 0 times will return an empty
-            %(klass)s.
-        axis : None
-            Must be ``None``. Has no effect but is accepted for compatibility
-            with numpy.
-
-        Returns
-        -------
-        repeated_array : %(klass)s
-            Newly created %(klass)s with repeated elements.
-
-        See Also
-        --------
-        Series.repeat : Equivalent function for Series.
-        Index.repeat : Equivalent function for Index.
-        numpy.repeat : Similar method for :class:`numpy.ndarray`.
-        ExtensionArray.take : Take arbitrary positions.
-
-        Examples
-        --------
-        >>> cat = pd.Categorical(['a', 'b', 'c'])
-        >>> cat
-        [a, b, c]
-        Categories (3, object): [a, b, c]
-        >>> cat.repeat(2)
-        [a, a, b, b, c, c]
-        Categories (3, object): [a, b, c]
-        >>> cat.repeat([1, 2, 3])
-        [a, b, b, c, c, c]
-        Categories (3, object): [a, b, c]
-        """
-
-    @Substitution(klass="ExtensionArray")
-    @Appender(_extension_array_shared_docs["repeat"])
-    def repeat(self, repeats, axis=None):
-        nv.validate_repeat(tuple(), dict(axis=axis))
-        ind = np.arange(len(self)).repeat(repeats)
-        return self.take(ind)
 
     # ------------------------------------------------------------------------
     # Indexing methods
     # ------------------------------------------------------------------------
+
     def take(self, indices, allow_fill=False, fill_value=None):
         from pandas.core.algorithms import take
 
@@ -399,8 +385,8 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
         # the data, before passing to take.
 
         result = take(data, indices, fill_value=fill_value,
-                        allow_fill = allow_fill)
-        return self._from_sequence(result, dtype = self.dtype)
+                      allow_fill=allow_fill)
+        return self._from_sequence(result, dtype=self.dtype)
 
     def copy(self):
         """
@@ -410,9 +396,9 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
         -------
         ExtensionArray
         """
-        raise AbstractMethodError(self)
+        return self.__class__(np.array(self._i).copy())
 
-    def view(self, dtype = None):
+    def view(self, dtype=None):
         """
         Return a view on the array.
 
@@ -432,7 +418,7 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
         #   giving a view with the same dtype as self.
         if dtype is not None:
             raise NotImplementedError(dtype)
-        return self[:]
+        return self._i[:]
 
     # ------------------------------------------------------------------------
     # Printing
@@ -444,13 +430,13 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
         # the short repr has no trailing newline, while the truncated
         # repr does. So we include a newline in our template, and strip
         # any trailing newlines from format_object_summary
-        data=format_object_summary(
+        data = format_object_summary(
             self, self._formatter(), indent_for_name=False
         ).rstrip(", \n")
         class_name = f"<{type(self).__name__}>\n"
         return f"{class_name}{data}\nLength: {len(self)}, dtype: {self.dtype}"
 
-    def _formatter(self, boxed = False):
+    def _formatter(self, boxed=False):
         if boxed:
             return str
         return repr
@@ -463,78 +449,24 @@ class LottoArray(ExtensionArray, ExtensionScalarOpsMixin):
     def _concat_same_type(
         cls, to_concat
     ):
-        """
-        Concatenate multiple array.
-
-        Parameters
-        ----------
-        to_concat : sequence of this type
-
-        Returns
-        -------
-        ExtensionArray
-        """
-        raise AbstractMethodError(cls)
-
-    # The _can_hold_na attribute is set to True so that pandas internals
-    # will use the ExtensionDtype.na_value as the NA value in operations
-    # such as take(), reindex(), shift(), etc.  In addition, those results
-    # will then be of the ExtensionArray subclass rather than an array
-    # of objects
-    _can_hold_na = True
+        vals = []
+        for n in to_concat:
+            if isinstance(n, cls):
+                vals.extend(n._i)
+        return cls(vals)
 
     @property
     def _ndarray_values(self):
-        
-        return np.array(self)
+
+        return np.array(self._i)
 
     def _reduce(self, name, skipna=True, **kwargs):
-        """
-        Return a scalar result of performing the reduction operation.
-
-        Parameters
-        ----------
-        name : str
-            Name of the function, supported values are:
-            { 'any', 'all', 'min', 'max', 'sum', 'mean', 'median', 'prod',
-            'std', 'var', 'sem', 'kurt', 'skew' }.
-        skipna : bool, default True
-            If True, skip NaN values.
-        **kwargs
-            Additional keyword arguments passed to the reduction function.
-            Currently, `ddof` is the only supported kwarg.
-
-        Returns
-        -------
-        scalar
-
-        Raises
-        ------
-        TypeError : subclass does not define reductions
-        """
-        hasget(np, n, dfn) 
-        raise TypeError(f"cannot perform {name} with type {self.dtype}")
+        fn = hasget(np, name, dfn)
+        return fn(self._i)
 
 
 @register_extension_dtype
 class LottoResult(ExtensionDtype):
-    """
-    type
-
-name
-
-construct_from_string
-
-The following attributes influence the behavior of the dtype in pandas operations
-
-_is_numeric
-
-_is_boolean
-
-Optionally one can override construct_array_type for construction with the name of this dtype via the Registry. See extensions.register_extension_dtype().
-
-construct_array_type
-    """
     _metadata = ('value', 'shape', 'ball1', 'ball2',
                  'ball3', 'ball4', 'ball5', 'ball6')
 
@@ -563,78 +495,22 @@ construct_array_type
         return False
 
     def __init__(self, value=tuple(), shape=(6, 52), **kw):
-        if not isinstance(value, list) or not isinstance(value, tuple):
-            if isinstance(value, Number):
-                if value <= 52:
-                    value = [value]
-        self._max, self.N = shape
-        self._N = pool(self.N)
-        self._cols = (
-            'ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6',
-            #  'bonusBall', 'powerBall'
-        )
-        self._i = []
-        val = [self.draw(v) for v in value]
-
-        for name in self._cols:
-            if name in list(kw.keys()):
-                self.draw(kw.get(name))
+        self._data = LottoArray(value=value, shape=shape, **kw)
 
     @classmethod
     def construct_from_string(cls, string):
         cols = ('ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6',)
-        # rg = re.compile(r'[\s,]+') 
+        # rg = re.compile(r'[\s,]+')
         # values = dict(zip(cols, [int(s) for rg.split(string)]))
 
-        pattern = re.compile(r'[\s,]+'.join(['(?P<{}>\d+)'.format(c) for c in cols]))
-        match = pattern.match(string) match.groupdict()
+        pattern = re.compile(
+            r'[\s,]+'.join(['(?P<{}>\d+)'.format(c) for c in cols]))
+        match = pattern.match(string)
         if match:
             return cls(**match.groupdict())
         else:
-            raise TypeError(f"Cannot construct a '{cls.__name__}' from
-                            " "'{string}'")
-
-    def get_results(self, to_numpy=True):
-        if not to_numpy:
-            return self._i
-
-        return {self._cols[i]: ball.array() for i, ball in enumerate(self._i) if i < len(self._cols)}
-
-    def _asdict(self):
-        return dict(zip(self._cols, self._i))
-
-    def __array__(self):
-        return np.where(np.isin(self._N, self._i), 0, 1)
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self.N}-{self._i})"
-
-    def draw(self, value):
-        if (not value or
-            len(self._i) == self._max or
-                value in self._i):
-            return None
-
-        b = ball(value, N=self.N, p=np.array(self))
-        self._i.append(b)
-        return b
-
-    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        if method == '__call__':
-            N = self.N
-            scalars = []
-            for input in inputs:
-                # In this case we accept only scalar numbers or ResultsArray.
-                if isinstance(input, Number):
-                    scalars.append(input)
-                elif isinstance(input, self.__class__):
-                    scalars.append(np.array(input))
-                    N = self.N
-                else:
-                    return NotImplemented
-            return self.__class__(binarr_to_values(ufunc(*scalars, **kwargs)))
-        else:
-            return NotImplemented
+            raise TypeError(
+                f"Cannot construct a '{cls.__name__}' from '{string}'")
 
     @classmethod
     def construct_array_type(cls):
@@ -644,3 +520,4 @@ construct_array_type
         -------
         type
         """
+        return LottoArray
