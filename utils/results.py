@@ -6,6 +6,7 @@ import numpy as np
 import os
 import json
 import logging
+from powerball.models import Powerball
 from lotto.models import LottoDraw
 from utils.numbers import NumPool, BallInt
 logger = logging.getLogger('default')
@@ -29,16 +30,18 @@ POSTKWARGS = {
     }
 }
 POSTurl = GAME["url"]
-URLDTFMT = '%d/%m/%y'
+URLDTFMT = '%d/%m/%Y'
 
 
 def datastr(year, game='LOTTO', **kw):
     return "gameName={gameName}&startDate=01/01/{year}&endDate=31/12/{year}&offset=0&limit=250&isAjax=true&isAjax=true".format(year=year, gameName=game)
 
 
-def url_from(start, game='LOTTO', **kw):
-    end = date.today().strftime(URLDTFMT)
-    return "gameName={gameName}&startDate={start}&endDate={end}&offset=0&limit=250&isAjax=true&isAjax=true".format(start=start, end=end, gameName=game)
+def url_from(start, game='LOTTO', end=None, **kw):
+    end = end or date.today().strftime(URLDTFMT)
+    u = "gameName={gameName}&startDate={start}&endDate={end}&offset=0&limit=250&isAjax=true&isAjax=true".format(start=start, end=end, gameName=game)
+    print(u)
+    return u
 
 
 class LottoResults:
@@ -54,14 +57,16 @@ class LottoResults:
         # self.jar = requests.cookies.RequestsCookieJar()
         self.sess = requests.Session()
 
-    def update_data(self, s):
+    def update_data(self, s, end=None):
+        model = {'powerball': Powerball, 'lotto': LottoDraw}.get(self.game.lower(), Powerball)
         if not s:
-            s = LottoDraw.objects.order_by(
+            s = model.objects.order_by(
                 '-draw_date').values_list('draw_date', flat=True)
+            s = s[0].strftime(URLDTFMT)
         try:
             response = self.sess.post(
                 self.url,
-                data=url_from(s, **{'game': self.game}),
+                data=url_from(s, **{'game': self.game, 'end': end}),
                 # timeout=0.8,
                 **POSTKWARGS
             )
@@ -69,6 +74,7 @@ class LottoResults:
                 result = response.json()
                 return result.get('data', [])
             else:
+                print('bad')
                 return []
         except Exception as e:
             print(e)
@@ -78,12 +84,16 @@ class LottoResults:
 
 def format_df(df):
     cols = ('drawNumber', 'ball1', 'ball2', 'ball3',
-            'ball4', 'ball5', 'ball6', 'bonusBall')
+            'ball4', 'ball5',
+            'ball6', 'bonusBall', 'powerBall'
+            )
     rn = {
-        'drawNumber': 'draw_number', 'bonusBall': 'bonus_ball', 'drawDate': 'draw_date',
+        'drawNumber': 'draw_number', 'bonusBall': 'bonus_ball', 'drawDate': 'draw_date', 'powerball': 'power_ball'
     }
+    c2 = df.columns.tolist()
     for c in cols:
-        df[c] = df[c].astype(int)
+        if c in c2:
+            df[c] = df[c].astype(int)
     df = df.rename(index=str, columns=rn)
     df.draw_date = df.draw_date.apply(
         lambda x: datetime.strptime(x, '%Y/%m/%d')).dt.strftime('%Y-%m-%d')
@@ -91,14 +101,15 @@ def format_df(df):
     return df
 
 
-def get_data():
-    lotto = LottoResults()
-    r = lotto.update_data(None)
+def get_data(start=None, **kw):
+    lotto = LottoResults(**kw)
+
+    r = lotto.update_data(start)
     if r:
         if len(r) > 0:
             df = pd.DataFrame(r)
             return format_df(df)
-    return False
+    return pd.DataFrame()
 
 
 def update_data(df):
@@ -107,6 +118,15 @@ def update_data(df):
         records = df.to_dict(orient='records')
         for row in records:
             c, r = LottoDraw.objects.get_or_create(**row)
+
+
+def update_datapb(s):
+    df = get_data(start=s, game='POWERBALL')
+    if df.empty:
+        return
+    records = df.to_dict(orient='records')
+    for row in records:
+        c, r = Powerball.objects.get_or_create(**row)
 
 
 def cols2nums(cols=('ball1', 'ball2', 'ball3', 'ball4', 'ball5', 'ball6')):

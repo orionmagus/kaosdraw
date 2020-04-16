@@ -4,27 +4,21 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-pipenv-to-requirements = "*"
 
 [packages]
 requests = "*"
 numpy = "*"
-pandas = "==1.0.0"
+pandas = "*"
 scipy = "*"
 ipython = "*"
 matplotlib = "*"
 openpyxl = "*"
 django = "*"
 rtree = "==0.8.0"
+torch = "*"
+torchvision = "*"
 tensorflow = "*"
 sklearn = "*"
-torch = "*"
-jupyter = "*"
-django-pandas = "*"
-numba = "*"
-django-adminlte3 = "*"
-django-management-tools = "*"
-django-shell-plus = "*"
 
 [requires]
 python_version = "3.6"

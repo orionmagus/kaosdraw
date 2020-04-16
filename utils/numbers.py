@@ -19,7 +19,7 @@ def conv(n, N=52):
     n = ceil(n) if isinstance(n, float) else n
     n = n % N
     return N - (n-1)
-
+# r = fetch("https://infographics.channelnewsasia.com/covid-19/newrec2.csv", {"credentials":"omit","headers":{"accept":"text/plain, */*; q=0.01","sec-fetch-dest":"empty","x-requested-with":"XMLHttpRequest"},"referrer":"https://infographics.channelnewsasia.com/covid-19/map.html","referrerPolicy":"no-referrer-when-downgrade","body":null,"method":"GET","mode":"cors"});
 
 def iconv(n, N=52):
     n = n % N
@@ -58,6 +58,7 @@ def binfmt(N=52):
 
 
 def arr2str(arr):
+
     return ''.join(np.array(arr).astype(str))
 
 

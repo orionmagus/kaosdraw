@@ -1,0 +1,1 @@
+from powerball.models import Powerball
