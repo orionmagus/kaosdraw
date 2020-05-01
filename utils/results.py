@@ -177,6 +177,31 @@ def load_data_target(records=False):
     return df
 
 
+def load_data_targetpb(records=False):
+    from django_pandas.io import read_frame
+    from utils.numbers import as_recs, NumPool
+    values = ['draw_number', 'ball1', 'ball2',
+              'ball3', 'ball4', 'ball5']
+    df_kwargs = dict(fieldnames=values, verbose=False,
+                     index_col='pk', coerce_float=False)
+
+    df = read_frame(Powerball.objects.all(), **df_kwargs)
+    if records:
+        df = as_recs(df)
+        values = ['record']
+        # df.record = df.record.apply(lambda k: NumPool(**json.loads(k)))
+    else:
+        values = values[1:]
+    trgs = df[values]
+    trgs = trgs.copy()
+    trgs.index = trgs.index - 1
+    df = df.merge(trgs, how='left', left_index=True,
+                  right_index=True, suffixes=['', '_y'])
+    if not records:
+        return df.fillna(0).astype(int)
+    return df
+
+
 def load_data(fname="data/lotto_daf.pickle"):
     # data = [[1994, '2020/02/08', 3, 41, 37, 28, 51, 42, 14],
     #         [1995, '2020/02/12', 16, 18, 32, 38, 39, 44, 31]]

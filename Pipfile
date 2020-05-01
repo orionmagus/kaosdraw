@@ -25,6 +25,7 @@ numba = "*"
 django-adminlte3 = "*"
 django-management-tools = "*"
 django-shell-plus = "*"
+django-extensions = "*"
 
 [requires]
 python_version = "3.6"
